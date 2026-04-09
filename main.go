@@ -1,20 +1,23 @@
 // tlshop — traceroute each network hop and probe TLS on port 443 (or a custom port).
 //
 // Usage:
-//   sudo tlshop [flags] <host>
+//
+//	sudo tlshop [flags] <host>
 //
 // Flags:
-//   -hops int      Maximum traceroute hops (default 30)
-//   -port int      TCP port to probe for TLS (default 443)
-//   -timeout dur   Per-hop timeout (default 3s)
-//   -sni string    Override SNI for TLS (default: original hostname)
-//   -skip-verify   Disable TLS certificate verification
+//
+//	-hops int      Maximum traceroute hops (default 30)
+//	-port int      TCP port to probe for TLS (default 443)
+//	-timeout dur   Per-hop timeout (default 3s)
+//	-sni string    Override SNI for TLS (default: original hostname)
+//	-skip-verify   Disable TLS certificate verification
 //
 // Requires CAP_NET_RAW or root privileges for ICMP raw sockets used in
 // traceroute. TLS probing does not need elevated privileges.
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"net"
@@ -32,13 +35,23 @@ func main() {
 	sniOverride := flag.String("sni", "", "Override TLS SNI (default: target hostname)")
 	flag.Parse()
 
-	if flag.NArg() < 1 {
-		fmt.Fprintf(os.Stderr, "Usage: %s [flags] <host|URL>\n", os.Args[0])
-		flag.PrintDefaults()
-		os.Exit(1)
+	var raw string
+	if flag.NArg() >= 1 {
+		raw = flag.Arg(0)
+	} else {
+		fmt.Print("Enter target URL or IP address: ")
+		scanner := bufio.NewScanner(os.Stdin)
+		if !scanner.Scan() {
+			fmt.Fprintf(os.Stderr, "Usage: %s [flags] <host|URL>\n", os.Args[0])
+			flag.PrintDefaults()
+			os.Exit(1)
+		}
+		raw = strings.TrimSpace(scanner.Text())
+		if raw == "" {
+			fmt.Fprintf(os.Stderr, "Error: no target specified\n")
+			os.Exit(1)
+		}
 	}
-
-	raw := flag.Arg(0)
 	hostname, destPort := parseTarget(raw)
 	if destPort != 0 {
 		*port = destPort
